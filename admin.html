@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DEV VAULT · Key Console</title>
+<style>
+:root{color-scheme:dark;--bg:#070b12;--panel:#101824;--line:#233247;--muted:#8fa3ba;--cyan:#55d8ff;--mint:#8ef0c0;--red:#ff7185}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 20% 0%,#12263a 0,transparent 45%),var(--bg);color:#edf6ff;font:15px Inter,system-ui,Arial}
+main{max-width:1000px;margin:auto;padding:28px 16px 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}
+.brand{font-weight:900;letter-spacing:2px}.brand span{color:var(--cyan)}.sub{color:var(--muted);font-size:12px;letter-spacing:2px;margin-top:5px}
+.pill{border:1px solid var(--line);padding:8px 12px;border-radius:999px;color:var(--mint);font-size:12px}
+.grid{display:grid;grid-template-columns: minmax(260px,340px) 1fr;gap:16px}.panel{background:linear-gradient(145deg,#121d2b,#0d141e);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 18px 50px #0005}
+h2{font-size:15px;margin:0 0 18px;letter-spacing:1px}label{display:block;color:var(--muted);font-size:12px;margin:13px 0 7px}
+input,select{width:100%;background:#080f18;border:1px solid #2b3d52;color:#fff;padding:12px;border-radius:10px;outline:none}
+input:focus,select:focus{border-color:var(--cyan)}button{border:0;border-radius:10px;padding:12px 15px;background:linear-gradient(90deg,#39bfe9,#8ef0c0);color:#041018;font-weight:800;cursor:pointer}
+button.secondary{background:#1b2a3a;color:#dcecff;border:1px solid #344a60}button.danger{background:#351923;color:#ff9aaa;border:1px solid #67303e}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.full{width:100%;margin-top:16px}
+.note{font-size:12px;color:var(--muted);line-height:1.5}.status{margin-top:12px;font-size:13px;min-height:20px;color:var(--mint);white-space:pre-wrap}
+.keybox{display:none;margin-top:14px;padding:13px;border:1px dashed #4b7187;border-radius:12px;background:#081722;overflow-wrap:anywhere}
+.keybox strong{display:block;color:var(--cyan);margin-bottom:8px}.keybox code{font-size:13px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.toolbar button{padding:9px 12px}
+.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}th,td{text-align:left;padding:12px 9px;border-bottom:1px solid #223246}th{color:var(--muted);font-weight:600}
+.tag{padding:4px 8px;border-radius:99px;background:#172b32;color:var(--mint);font-size:11px}.tag.used{background:#302719;color:#ffd18a}.tag.expired{background:#351923;color:#ff9aaa}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+</style></head>
+<body><main>
+<header class="top"><div><div class="brand">DEV <span>VAULT</span> / KEY CONSOLE</div><div class="sub">LICENSE MANAGEMENT SYSTEM</div></div><div class="pill">● API CONSOLE</div></header>
+<div class="grid">
+<section class="panel">
+<h2>ADMIN AUTHENTICATION</h2>
+<label>Admin token</label><input id="token" type="password" placeholder="Enter ADMIN_TOKEN" autocomplete="off">
+<p class="note">Token is kept only in this page session. Never put it inside public user-facing HTML.</p>
+<hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
+<h2>CREATE LICENSE KEY</h2>
+<label>Duration</label><input id="duration" type="number" min="1" value="7">
+<label>Unit</label><select id="unit"><option value="days">Days</option><option value="hours">Hours</option><option value="minutes">Minutes</option></select>
+<button class="full" onclick="addKey()">＋ GENERATE KEY</button>
+<div id="created" class="keybox"><strong>NEW KEY · COPY NOW</strong><code id="newkey"></code><div class="actions"><button class="secondary" onclick="copyKey()">COPY KEY</button></div><p class="note">The full key is displayed only once. Store it safely.</p></div>
+<div id="msg" class="status"></div>
+</section>
+<section class="panel">
+<h2>LICENSE INVENTORY</h2>
+<div class="toolbar"><button onclick="loadUnused()">UNUSED KEYS</button><button class="secondary" onclick="loadAll()">ALL KEY STATUS</button></div>
+<div class="note" id="hint">Authenticate with your admin token, then load the inventory.</div>
+<div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>ID</th><th>Key ref</th><th>Duration</th><th>Status</th><th>Created</th></tr></thead><tbody id="rows"><tr><td colspan="5" class="note">No data loaded.</td></tr></tbody></table></div>
+</section></div></main>
+<script>
+const API_BASE = ""; // Same Render Web Service. For separate API, enter its https:// URL.
+let latestKey = "";
+function headers(){return {"Content-Type":"application/json","X-Admin-Token":document.getElementById("token").value.trim()};}
+async function api(path, options={}){const r=await fetch(API_BASE+path,{...options,headers:{...headers(),...(options.headers||{})}});let d={};try{d=await r.json()}catch(e){}if(!r.ok)throw new Error(d.message||d.error||("HTTP "+r.status));return d;}
+function say(t, bad=false){const el=document.getElementById("msg");el.textContent=t;el.style.color=bad?"var(--red)":"var(--mint)";}
+async function addKey(){try{const duration=Number(document.getElementById("duration").value),unit=document.getElementById("unit").value;if(!Number.isInteger(duration)||duration<1)throw Error("Enter a valid duration.");const d=await api("/api/add_key",{method:"POST",body:JSON.stringify({duration,unit})});latestKey=d.key;document.getElementById("newkey").textContent=latestKey;document.getElementById("created").style.display="block";say("Key generated successfully.");loadUnused();}catch(e){say(e.message,true);}}
+async function loadUnused(){try{const d=await api("/api/get_key");render(d.keys);document.getElementById("hint").textContent="Unused key references. Full key values are intentionally not retrievable."; }catch(e){say(e.message,true);}}
+async function loadAll(){try{const d=await api("/api/key_status");render(d.keys);document.getElementById("hint").textContent="Latest 500 keys. Key values are stored as hashes."; }catch(e){say(e.message,true);}}
+function render(items){const body=document.getElementById("rows");if(!items.length){body.innerHTML='<tr><td colspan="5">No keys found.</td></tr>';return;}body.innerHTML=items.map(x=>`<tr><td>${x.id}</td><td>${esc(x.key_prefix)}…</td><td>${fmt(x.duration_seconds)}</td><td><span class="tag ${x.status==='used'?'used':''}">${esc(x.status)}</span></td><td>${esc(x.created_at||"")}</td></tr>`).join("");}
+function fmt(s){if(s%86400===0)return (s/86400)+" days";if(s%3600===0)return (s/3600)+" hours";return Math.round(s/60)+" min";}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+async function copyKey(){if(!latestKey)return;try{await navigator.clipboard.writeText(latestKey);say("Key copied.");}catch(e){say("Clipboard unavailable; select and copy the key manually.",true);}}
+</script></body></html>
